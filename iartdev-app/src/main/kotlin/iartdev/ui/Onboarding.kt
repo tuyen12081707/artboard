@@ -144,9 +144,9 @@ fun Onboarding(
                 }
 
                 Spacer(Modifier.height(28.dp))
-                OnboardingStep(1, "Apply the Artboard plugin", "In your Compose project's module build.gradle.kts.")
-                OnboardingStep(2, "Run a snapshot", "iArtDev can run this for you — or use a terminal: ./gradlew :module:artboardSnapshot")
-                OnboardingStep(3, "Open the result", "Point iArtDev at the output folder, or drop it anywhere on this window.")
+                OnboardingStep(1, "Point iArtDev at your project", "It finds your Compose module and offers to apply the Artboard plugin for you — no manual editing.")
+                OnboardingStep(2, "Run a snapshot", "iArtDev runs it for you — or use a terminal: ./gradlew :module:artboardSnapshot")
+                OnboardingStep(3, "Browse the result", "Opens automatically, and auto-refreshes whenever you re-run a snapshot.")
 
                 Spacer(Modifier.height(24.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {

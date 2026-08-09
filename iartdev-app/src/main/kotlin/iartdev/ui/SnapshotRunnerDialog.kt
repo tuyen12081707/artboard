@@ -44,7 +44,12 @@ import artboard.host.Studio
 import iartdev.gradlerunner.ArtboardModuleCandidate
 import iartdev.gradlerunner.GradleProjectScanner
 import iartdev.gradlerunner.GradleSnapshotProcess
+import iartdev.gradlerunner.PluginInstallResult
 import iartdev.gradlerunner.RunEvent
+import iartdev.gradlerunner.appliesArtboardPlugin
+import iartdev.gradlerunner.artboardPluginLine
+import iartdev.gradlerunner.installArtboardPlugin
+import iartdev.gradlerunner.settingsLooksPluginReady
 import iartdev.theme.IArtDev
 import iartdev.theme.IArtDevColors
 import iartdev.theme.IArtDevTheme
@@ -64,6 +69,14 @@ private sealed interface RunnerPhase {
         val projectRoot: File,
         val wrapper: File,
         val candidates: List<ArtboardModuleCandidate>,
+    ) : RunnerPhase
+
+    /** Artboard isn't applied at the chosen Gradle path yet — confirm before writing anything. */
+    data class ConfirmInstall(
+        val previous: Ready,
+        val buildFile: File,
+        val previewLine: String,
+        val settingsWarning: String?,
     ) : RunnerPhase
 
     data class Running(val startedAtMillis: Long) : RunnerPhase
@@ -202,8 +215,8 @@ fun SnapshotRunnerDialog(
                             Spacer(Modifier.height(10.dp))
                         } else if (current.candidates.isEmpty()) {
                             BasicText(
-                                text = "No module here applies the Artboard plugin automatically — " +
-                                    "enter its Gradle path below.",
+                                text = "No module here already has Artboard applied — enter the Gradle path of " +
+                                    "your Compose UI module below and iArtDev will offer to set it up.",
                                 style = Studio.type.body.copy(color = colors.inkSoft),
                             )
                             Spacer(Modifier.height(10.dp))
@@ -212,7 +225,53 @@ fun SnapshotRunnerDialog(
                         Spacer(Modifier.height(4.dp))
                         GradlePathField(value = gradlePath, onValueChange = { gradlePath = it }, colors = colors)
                         Spacer(Modifier.height(14.dp))
-                        DialogButton(label = "Run artboardSnapshot") { runSnapshot(current.projectRoot, current.wrapper) }
+                        DialogButton(label = "Run artboardSnapshot") {
+                            val buildFile = GradleProjectScanner.moduleBuildFile(current.projectRoot, gradlePath)
+                            if (buildFile.isFile && buildFile.appliesArtboardPlugin()) {
+                                runSnapshot(current.projectRoot, current.wrapper)
+                            } else {
+                                val settingsFile = GradleProjectScanner.findSettingsFile(current.projectRoot)
+                                val settingsWarning = if (settingsFile == null || !settingsLooksPluginReady(settingsFile)) {
+                                    "Heads up: ${settingsFile?.name ?: "settings.gradle.kts"} doesn't obviously list " +
+                                        "mavenCentral() for plugin resolution — if the run below fails to resolve " +
+                                        "the plugin, add it there."
+                                } else {
+                                    null
+                                }
+                                phase = RunnerPhase.ConfirmInstall(
+                                    previous = current,
+                                    buildFile = buildFile,
+                                    previewLine = artboardPluginLine(),
+                                    settingsWarning = settingsWarning,
+                                )
+                            }
+                        }
+                    }
+
+                    is RunnerPhase.ConfirmInstall -> {
+                        BasicText(
+                            text = "Artboard isn't applied at ${gradlePath.ifEmpty { "(root project)" }} yet. " +
+                                "iArtDev will add this line to ${current.buildFile.name}'s plugins { } block:",
+                            style = Studio.type.body.copy(color = colors.inkSoft),
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        BasicText(text = current.previewLine, style = Studio.type.mono.copy(color = colors.ink))
+                        if (current.settingsWarning != null) {
+                            Spacer(Modifier.height(8.dp))
+                            BasicText(text = current.settingsWarning, style = Studio.type.body.copy(color = ERROR_COLOR))
+                        }
+                        Spacer(Modifier.height(14.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            DialogButton(label = "Apply & Run") {
+                                when (val result = installArtboardPlugin(current.buildFile)) {
+                                    is PluginInstallResult.Failed ->
+                                        phase = RunnerPhase.Failed(result.reason)
+                                    PluginInstallResult.AlreadyApplied, PluginInstallResult.Installed ->
+                                        runSnapshot(current.previous.projectRoot, current.previous.wrapper)
+                                }
+                            }
+                            DialogTextAction(label = "Cancel") { phase = current.previous }
+                        }
                     }
 
                     is RunnerPhase.Running -> {

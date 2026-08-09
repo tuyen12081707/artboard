@@ -71,13 +71,7 @@ class GradleSnapshotProcess {
          * under [projectRoot] — fixed by the plugin (`layout.buildDirectory.dir("artboard/snapshots")`),
          * not discovered heuristically.
          */
-        fun manifestFile(projectRoot: File, gradlePath: String): File {
-            val moduleDir = if (gradlePath.isEmpty()) {
-                projectRoot
-            } else {
-                File(projectRoot, gradlePath.removePrefix(":").replace(':', File.separatorChar))
-            }
-            return File(moduleDir, "build/artboard/snapshots/manifest.json")
-        }
+        fun manifestFile(projectRoot: File, gradlePath: String): File =
+            File(GradleProjectScanner.moduleDir(projectRoot, gradlePath), "build/artboard/snapshots/manifest.json")
     }
 }

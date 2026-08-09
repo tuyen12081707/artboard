@@ -32,6 +32,24 @@ object GradleProjectScanner {
         return wrapper.takeIf { it.isFile }
     }
 
+    /** `settings.gradle.kts` (or the Groovy variant) at [projectRoot], if present. */
+    fun findSettingsFile(projectRoot: File): File? =
+        listOf("settings.gradle.kts", "settings.gradle")
+            .map { File(projectRoot, it) }
+            .firstOrNull { it.isFile }
+
+    /** The module directory under [projectRoot] for a Gradle path like `:app:ui` (`""` = root itself). */
+    fun moduleDir(projectRoot: File, gradlePath: String): File =
+        if (gradlePath.isEmpty()) {
+            projectRoot
+        } else {
+            File(projectRoot, gradlePath.removePrefix(":").replace(':', File.separatorChar))
+        }
+
+    /** The `build.gradle.kts` iArtDev would edit/read for a Gradle path under [projectRoot]. */
+    fun moduleBuildFile(projectRoot: File, gradlePath: String): File =
+        File(moduleDir(projectRoot, gradlePath), "build.gradle.kts")
+
     /**
      * Modules under [projectRoot] whose build file mentions the Artboard plugin id.
      *
