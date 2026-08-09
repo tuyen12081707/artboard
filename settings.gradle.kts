@@ -20,3 +20,6 @@ include(":artboard-codegen")
 include(":artboard-gradle-plugin")
 include(":artboard-viewer")
 include(":artboard-viewer-dist")
+
+include(":iartdev-extension-api")
+include(":iartdev-app")

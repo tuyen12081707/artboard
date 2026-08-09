@@ -250,7 +250,7 @@ private fun studioType(): StudioType {
  * frame bodies are left to the consumer's own theme.
  */
 @Composable
-internal fun StudioTheme(
+fun StudioTheme(
     darkTheme: Boolean,
     content: @Composable () -> Unit,
 ) {
