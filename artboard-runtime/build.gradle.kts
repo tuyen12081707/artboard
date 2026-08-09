@@ -17,7 +17,7 @@ mavenPublishing {
     pom {
         name = "Artboard Runtime"
         description = "Runtime for the Artboard spatial Compose Multiplatform preview gallery"
-        url = "https://github.com/crowded-libs/artboard"
+        url = "https://github.com/tuyen12081707/artboard"
 
         licenses {
             license {
@@ -34,9 +34,9 @@ mavenPublishing {
             }
         }
         scm {
-            url = "https://github.com/crowded-libs/artboard"
-            connection = "scm:git:git://github.com/crowded-libs/artboard.git"
-            developerConnection = "scm:git:ssh://github.com/crowded-libs/artboard.git"
+            url = "https://github.com/tuyen12081707/artboard"
+            connection = "scm:git:git://github.com/tuyen12081707/artboard.git"
+            developerConnection = "scm:git:ssh://github.com/tuyen12081707/artboard.git"
         }
     }
 }

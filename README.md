@@ -1,7 +1,7 @@
 # Artboard
 
-[![CI](https://github.com/crowded-libs/artboard/actions/workflows/ci.yml/badge.svg)](https://github.com/crowded-libs/artboard/actions/workflows/ci.yml)
-[![Maven Central](https://img.shields.io/maven-central/v/io.github.crowded-libs.artboard/artboard-gradle-plugin?label=Maven%20Central)](https://central.sonatype.com/artifact/io.github.crowded-libs.artboard/artboard-gradle-plugin)
+[![CI](https://github.com/tuyen12081707/artboard/actions/workflows/ci.yml/badge.svg)](https://github.com/tuyen12081707/artboard/actions/workflows/ci.yml)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.tuyen12081707.artboard/artboard-gradle-plugin?label=Maven%20Central)](https://central.sonatype.com/artifact/io.github.tuyen12081707.artboard/artboard-gradle-plugin)
 [![Kotlin 2.4.0](https://img.shields.io/badge/Kotlin-2.4.0-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org/)
 [![Compose Multiplatform 1.11.1](https://img.shields.io/badge/Compose%20Multiplatform-1.11.1-4285F4?logo=jetbrains&logoColor=white)](https://www.jetbrains.com/compose-multiplatform/)
 
@@ -9,7 +9,7 @@ Artboard is a spatial browser gallery for Compose Multiplatform `@Preview`s.
 It discovers previews with KSP, hangs them on a pan-and-zoom board, and gives
 every frame a stable URL-addressable ID.
 
-[Try the live Crowded Café demo](https://crowded-libs.github.io/artboard/).
+[Try the live Crowded Café demo](https://tuyen12081707.github.io/artboard/).
 
 ![Artboard gallery showing the Crowded Café showcase](artboard_sample.gif)
 
@@ -68,7 +68,7 @@ plugins {
     kotlin("multiplatform")
     id("org.jetbrains.compose")
     id("org.jetbrains.kotlin.plugin.compose")
-    id("io.github.crowded-libs.artboard") version "0.2.1"
+    id("io.github.tuyen12081707.artboard") version "0.2.2"
 }
 ```
 

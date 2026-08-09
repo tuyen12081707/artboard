@@ -35,7 +35,7 @@ mavenPublishing {
     pom {
         name = "Artboard Viewer Distribution"
         description = "Prebuilt Artboard Wasm gallery for snapshot-mode consumers"
-        url = "https://github.com/crowded-libs/artboard"
+        url = "https://github.com/tuyen12081707/artboard"
 
         licenses {
             license {
@@ -52,9 +52,9 @@ mavenPublishing {
             }
         }
         scm {
-            url = "https://github.com/crowded-libs/artboard"
-            connection = "scm:git:git://github.com/crowded-libs/artboard.git"
-            developerConnection = "scm:git:ssh://github.com/crowded-libs/artboard.git"
+            url = "https://github.com/tuyen12081707/artboard"
+            connection = "scm:git:git://github.com/tuyen12081707/artboard.git"
+            developerConnection = "scm:git:ssh://github.com/tuyen12081707/artboard.git"
         }
     }
 }

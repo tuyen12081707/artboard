@@ -2,10 +2,10 @@ package iartdev.gradlerunner
 
 import java.io.File
 
-private const val ARTBOARD_PLUGIN_ID = "io.github.crowded-libs.artboard"
+private const val ARTBOARD_PLUGIN_ID = "io.github.tuyen12081707.artboard"
 
 /** Version applied by [installArtboardPlugin] when the caller doesn't pin one. */
-const val DEFAULT_ARTBOARD_VERSION: String = "0.2.1"
+const val DEFAULT_ARTBOARD_VERSION: String = "0.2.2"
 
 /** Whether [this] build file already applies the Artboard plugin, by any means. */
 fun File.appliesArtboardPlugin(): Boolean =

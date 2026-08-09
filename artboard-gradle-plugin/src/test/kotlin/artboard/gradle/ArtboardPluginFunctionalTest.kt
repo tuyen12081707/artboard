@@ -11,7 +11,7 @@ class ArtboardPluginFunctionalTest {
         withFixture { projectDir ->
             projectDir.resolve("settings.gradle.kts").writeText("rootProject.name = \"fixture\"")
             projectDir.resolve("build.gradle.kts").writeText(
-                "plugins { id(\"io.github.crowded-libs.artboard\") }",
+                "plugins { id(\"io.github.tuyen12081707.artboard\") }",
             )
 
             val result = GradleRunner.create()
@@ -30,7 +30,7 @@ class ArtboardPluginFunctionalTest {
         withFixture { projectDir ->
             projectDir.resolve("settings.gradle.kts").writeText("rootProject.name = \"fixture\"")
             projectDir.resolve("build.gradle.kts").writeText(
-                "plugins { id(\"io.github.crowded-libs.artboard\") }",
+                "plugins { id(\"io.github.tuyen12081707.artboard\") }",
             )
 
             val result = GradleRunner.create()

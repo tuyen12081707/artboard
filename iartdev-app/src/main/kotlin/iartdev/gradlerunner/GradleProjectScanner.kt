@@ -19,7 +19,7 @@ data class ArtboardModuleCandidate(
  * cheap to unit test.
  */
 object GradleProjectScanner {
-    private const val ARTBOARD_PLUGIN_ID = "io.github.crowded-libs.artboard"
+    private const val ARTBOARD_PLUGIN_ID = "io.github.tuyen12081707.artboard"
     private val PRUNED_DIRECTORY_NAMES = setOf(
         ".git", ".gradle", ".idea", ".kotlin", "build", "node_modules", "out", "dist",
     )
@@ -53,7 +53,7 @@ object GradleProjectScanner {
     /**
      * Modules under [projectRoot] whose build file mentions the Artboard plugin id.
      *
-     * Known limitation: this text-matches a literal `id("io.github.crowded-libs.artboard")`
+     * Known limitation: this text-matches a literal `id("io.github.tuyen12081707.artboard")`
      * (how every sample in this project applies it) and will miss version-catalog
      * `alias(...)` application, convention-plugin indirection, a `settings.gradle.kts`
      * that remaps a module's `projectDir`, or a Groovy `build.gradle`. Callers must

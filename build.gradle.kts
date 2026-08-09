@@ -9,7 +9,7 @@ plugins {
     alias(libs.plugins.mavenPublish) apply false
 }
 
-group = "io.github.crowded-libs.artboard"
+group = "io.github.tuyen12081707.artboard"
 version = libs.versions.artboard.get()
 
 allprojects {

@@ -3,10 +3,10 @@ plugins {
     alias(libs.plugins.androidMultiplatformLibrary)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
-    id("io.github.crowded-libs.artboard")
+    id("io.github.tuyen12081707.artboard")
 }
 
-group = "io.github.crowded-libs.artboard.samples"
+group = "io.github.tuyen12081707.artboard.samples"
 
 compose.resources {
     packageOfResClass = "artboard.sample.androidlight.resources"

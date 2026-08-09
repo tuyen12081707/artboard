@@ -34,7 +34,7 @@ changes (live *and* snapshot). Keep screenshots and verification dumps in
 
 - `@Preview` is the catalog API; support current and legacy Compose Preview FQCNs.
 - Stable frame IDs derive from FQCN plus preview name.
-- Consumers apply only `io.github.crowded-libs.artboard`; never require source imports,
+- Consumers apply only `io.github.tuyen12081707.artboard`; never require source imports,
   manual registries, KSP declarations, Artboard dependencies, or generated `actual`s.
 - Never add Wasm or other targets for a consumer. Targets are explicit opt-in.
   Prefer live Wasm when present; otherwise bind to `jvm` or `android` snapshot mode.
