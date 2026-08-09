@@ -20,9 +20,9 @@ include(":androidApp")
 
 includeBuild("../..") {
     dependencySubstitution {
-        substitute(module("io.github.crowded-libs.artboard:artboard-codegen"))
+        substitute(module("io.github.tuyen12081707.artboard:artboard-codegen"))
             .using(project(":artboard-codegen"))
-        substitute(module("io.github.crowded-libs.artboard:artboard-runtime"))
+        substitute(module("io.github.tuyen12081707.artboard:artboard-runtime"))
             .using(project(":artboard-runtime"))
     }
 }

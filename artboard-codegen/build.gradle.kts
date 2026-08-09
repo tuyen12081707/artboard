@@ -19,7 +19,7 @@ mavenPublishing {
     pom {
         name = "Artboard Codegen"
         description = "KSP processor that discovers Compose Multiplatform previews for Artboard"
-        url = "https://github.com/crowded-libs/artboard"
+        url = "https://github.com/tuyen12081707/artboard"
 
         licenses {
             license {
@@ -36,9 +36,9 @@ mavenPublishing {
             }
         }
         scm {
-            url = "https://github.com/crowded-libs/artboard"
-            connection = "scm:git:git://github.com/crowded-libs/artboard.git"
-            developerConnection = "scm:git:ssh://github.com/crowded-libs/artboard.git"
+            url = "https://github.com/tuyen12081707/artboard"
+            connection = "scm:git:git://github.com/tuyen12081707/artboard.git"
+            developerConnection = "scm:git:ssh://github.com/tuyen12081707/artboard.git"
         }
     }
 }

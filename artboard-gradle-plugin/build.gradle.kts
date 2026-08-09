@@ -8,11 +8,11 @@ plugins {
 // toolchain download requirements in the included build.
 
 gradlePlugin {
-    website.set("https://github.com/crowded-libs/artboard")
-    vcsUrl.set("https://github.com/crowded-libs/artboard.git")
+    website.set("https://github.com/tuyen12081707/artboard")
+    vcsUrl.set("https://github.com/tuyen12081707/artboard.git")
     plugins {
         create("artboard") {
-            id = "io.github.crowded-libs.artboard"
+            id = "io.github.tuyen12081707.artboard"
             implementationClass = "artboard.gradle.ArtboardPlugin"
             displayName = "Artboard"
             description =
@@ -83,7 +83,7 @@ mavenPublishing {
     pom {
         name = "Artboard Gradle Plugin"
         description = "Gradle plugin for generating, serving, and exporting Artboard Compose Multiplatform galleries"
-        url = "https://github.com/crowded-libs/artboard"
+        url = "https://github.com/tuyen12081707/artboard"
 
         licenses {
             license {
@@ -100,9 +100,9 @@ mavenPublishing {
             }
         }
         scm {
-            url = "https://github.com/crowded-libs/artboard"
-            connection = "scm:git:git://github.com/crowded-libs/artboard.git"
-            developerConnection = "scm:git:ssh://github.com/crowded-libs/artboard.git"
+            url = "https://github.com/tuyen12081707/artboard"
+            connection = "scm:git:git://github.com/tuyen12081707/artboard.git"
+            developerConnection = "scm:git:ssh://github.com/tuyen12081707/artboard.git"
         }
     }
 }
