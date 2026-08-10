@@ -13,6 +13,7 @@ import org.gradle.api.tasks.testing.Test
 import org.jetbrains.compose.ComposeExtension
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation
+import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
 import org.jetbrains.kotlin.gradle.targets.js.dsl.KotlinJsBinaryMode
 import org.jetbrains.kotlin.gradle.targets.js.ir.Executable
 import org.jetbrains.kotlin.gradle.targets.js.ir.KotlinJsIrCompilation
@@ -26,6 +27,31 @@ import org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget
  * consumer forgot to apply KMP, so `artboardStatus` can explain the problem.
  */
 internal object ArtboardKotlinIntegration {
+
+    /**
+     * Adds [coordinate] to [sourceSet]'s implementation configuration unless the
+     * consumer already declared that module themselves — e.g. to pin their own
+     * artboard-runtime version. Gradle would resolve either declaration to a single
+     * version anyway, but skipping a redundant add keeps the consumer's own version
+     * choice visibly authoritative instead of racing the plugin's.
+     */
+    private fun addImplementationIfAbsent(
+        project: Project,
+        sourceSet: KotlinSourceSet,
+        coordinate: String,
+    ) {
+        val (group, name) = coordinate.split(":", limit = 3)
+            .let { parts -> parts[0] to parts[1] }
+        val configurationName = "${sourceSet.name}Implementation"
+        val alreadyDeclared = project.configurations.findByName(configurationName)
+            ?.dependencies
+            ?.any { it.group == group && it.name == name }
+            ?: false
+        if (!alreadyDeclared) {
+            sourceSet.dependencies { implementation(coordinate) }
+        }
+    }
+
     fun configure(
         project: Project,
         generatedPackage: String,
@@ -174,27 +200,23 @@ internal object ArtboardKotlinIntegration {
         generateHost.configure { it.mode.set(GalleryMode.AndroidSnapshot) }
 
         kotlin.sourceSets.named(galleryTarget.mainSourceSetName).configure { sourceSet ->
-            sourceSet.dependencies {
-                implementation(runtimeDependency)
-            }
+            addImplementationIfAbsent(project, sourceSet, runtimeDependency)
         }
 
         // The renderer is a generated JUnit test, so it and its harness live in the
         // plugin-created host-test source set — never in the consumer's own tests.
         kotlin.sourceSets.named(ANDROID_HOST_TEST_SOURCE_SET).configure { sourceSet ->
             sourceSet.kotlin.srcDir(generateHost.flatMap { it.outputDirectory.dir("kotlin") })
-            sourceSet.dependencies {
-                implementation(runtimeDependency)
-                // Roborazzi exposes Robolectric only as `implementation`, so the
-                // generated test's own `org.robolectric` imports need it declared.
-                implementation(JUNIT_DEPENDENCY)
-                implementation(ROBOLECTRIC_DEPENDENCY)
-                // Roborazzi owns the capture: its composable overload sidesteps the
-                // Compose test-host idling that times out under Robolectric, and never
-                // launches an Activity — so no Compose ui-test artifacts are needed.
-                implementation(ROBORAZZI_DEPENDENCY)
-                implementation(ROBORAZZI_COMPOSE_DEPENDENCY)
-            }
+            addImplementationIfAbsent(project, sourceSet, runtimeDependency)
+            // Roborazzi exposes Robolectric only as `implementation`, so the
+            // generated test's own `org.robolectric` imports need it declared.
+            addImplementationIfAbsent(project, sourceSet, JUNIT_DEPENDENCY)
+            addImplementationIfAbsent(project, sourceSet, ROBOLECTRIC_DEPENDENCY)
+            // Roborazzi owns the capture: its composable overload sidesteps the
+            // Compose test-host idling that times out under Robolectric, and never
+            // launches an Activity — so no Compose ui-test artifacts are needed.
+            addImplementationIfAbsent(project, sourceSet, ROBORAZZI_DEPENDENCY)
+            addImplementationIfAbsent(project, sourceSet, ROBORAZZI_COMPOSE_DEPENDENCY)
         }
 
         project.tasks.named(ANDROID_HOST_TEST_COMPILE_TASK).configure { it.dependsOn(generateHost) }
@@ -325,9 +347,7 @@ internal object ArtboardKotlinIntegration {
 
         // Processor dependency is registered early via [registerJvmKspProcessorEarly].
         kotlin.sourceSets.named(galleryTarget.mainSourceSetName).configure { sourceSet ->
-            sourceSet.dependencies {
-                implementation(runtimeDependency)
-            }
+            addImplementationIfAbsent(project, sourceSet, runtimeDependency)
         }
 
         val mainCompilation = target.compilations.getByName(KotlinCompilation.MAIN_COMPILATION_NAME)
@@ -563,9 +583,7 @@ internal object ArtboardKotlinIntegration {
 
         project.dependencies.add(galleryTarget.kspConfigurationName, codegenDependency)
         kotlin.sourceSets.named(galleryTarget.mainSourceSetName).configure { sourceSet ->
-            sourceSet.dependencies {
-                implementation(runtimeDependency)
-            }
+            addImplementationIfAbsent(project, sourceSet, runtimeDependency)
         }
 
         val mainCompilation: KotlinJsIrCompilation =
