@@ -1,16 +1,11 @@
 package iartdev
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.hoverable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -19,36 +14,45 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.pointer.PointerIcon
-import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowState
 import androidx.compose.ui.window.application
 import artboard.host.ArtboardApp
-import artboard.host.LocalStudioColors
 import artboard.host.Studio
-import artboard.host.StudioTheme
 import artboard.model.PreviewFrame
 import artboard.registry.ArtboardRegistry
+import iartdev.gradlerunner.GradleProjectScanner
+import iartdev.gradlerunner.GradleSnapshotProcess
+import iartdev.gradlerunner.KeepAwake
+import iartdev.gradlerunner.RunEvent
 import iartdev.prefs.RecentFolder
 import iartdev.prefs.RecentFolders
+import iartdev.prefs.RunConfig
+import iartdev.prefs.RunConfigStore
+import iartdev.prefs.Session
 import iartdev.snapshot.SnapshotImageStore
 import iartdev.snapshot.SnapshotManifest
 import iartdev.snapshot.SnapshotTile
 import iartdev.snapshot.SnapshotWatcher
 import iartdev.snapshot.parseSnapshotManifest
+import iartdev.theme.IArtDevTheme
+import iartdev.ui.BottomBar
+import iartdev.ui.HelpScreen
 import iartdev.ui.Onboarding
+import iartdev.ui.Screen
+import iartdev.ui.Sidebar
 import iartdev.ui.SnapshotRunnerDialog
+import iartdev.ui.ToolPathsScreen
 import java.io.File
 import java.util.prefs.Preferences
 import javax.swing.JFileChooser
 import kotlinx.coroutines.launch
 
 private const val MANIFEST_FILE_NAME = "manifest.json"
+private val SYNC_ERROR_COLOR = Color(0xFFB3261E)
 
 fun main(args: Array<String>) = application {
     Window(
@@ -79,6 +83,11 @@ private fun IArtDevApp(initialFolder: String? = null) {
     var state by remember { mutableStateOf<LoadState>(LoadState.Empty) }
     var recent by remember { mutableStateOf<List<RecentFolder>>(emptyList()) }
     var showRunner by remember { mutableStateOf(false) }
+    var selectedScreen by remember { mutableStateOf(Screen.Gallery) }
+    var displayName by remember { mutableStateOf<String?>(null) }
+    var lastRunConfig by remember { mutableStateOf<RunConfig?>(null) }
+    var syncing by remember { mutableStateOf(false) }
+    var syncError by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
     fun open(folder: File) {
@@ -107,18 +116,59 @@ private fun IArtDevApp(initialFolder: String? = null) {
         }
     }
 
+    /**
+     * Re-runs the last successful (project root, Gradle path) without walking back
+     * through [SnapshotRunnerDialog]'s picker. Success is picked up implicitly by the
+     * [SnapshotWatcher] already active on the loaded folder below; only failure needs
+     * surfacing here.
+     */
+    fun sync() {
+        val config = lastRunConfig ?: return
+        val root = File(config.projectRootPath)
+        val wrapper = GradleProjectScanner.findWrapper(root)
+        if (wrapper == null) {
+            syncError = "No gradlew found at ${root.path} anymore — use Run Snapshot… to pick a new root."
+            return
+        }
+        syncing = true
+        syncError = null
+        val keepAwake = KeepAwake()
+        keepAwake.start()
+        scope.launch {
+            GradleSnapshotProcess().run(root, wrapper, config.gradlePath).collect { event ->
+                when (event) {
+                    is RunEvent.Line -> Unit
+                    is RunEvent.Finished -> {
+                        keepAwake.stop()
+                        syncing = false
+                        if (event.exitCode != 0) {
+                            syncError = "Sync failed — Gradle exited with code ${event.exitCode}."
+                        }
+                    }
+                    is RunEvent.Failed -> {
+                        keepAwake.stop()
+                        syncing = false
+                        syncError = event.error.message ?: "Could not start Gradle."
+                    }
+                }
+            }
+        }
+    }
+
     // Reopen the last project on launch so double-clicking the app is enough after day one.
     // A launch argument (e.g. an "Open with iArtDev" association) overrides this.
     remember {
         RecentFolders.migrateLegacyIfNeeded(prefs)
         recent = RecentFolders.load(prefs)
+        displayName = Session.loadDisplayName(prefs)
+        lastRunConfig = RunConfigStore.load(prefs)
         val path = initialFolder ?: recent.firstOrNull()?.path
         path?.let { File(it) }
             ?.takeIf { it.isDirectory }
             ?.let(::open)
     }
 
-    // Auto-reload if the open folder's manifest is rewritten (in-app runner or a
+    // Auto-reload if the open folder's manifest is rewritten (in-app runner, Sync, or a
     // terminal re-run of artboardSnapshot) — no restart needed.
     val loadedFolder = (state as? LoadState.Loaded)?.folder
     if (loadedFolder != null) {
@@ -129,45 +179,112 @@ private fun IArtDevApp(initialFolder: String? = null) {
         }
     }
 
-    when (val current = state) {
-        is LoadState.Loaded ->
-            Box(modifier = Modifier.fillMaxSize()) {
-                ArtboardApp(
-                    registry = current.registry,
-                    title = current.manifest.title,
-                    initialDarkTheme = isSystemInDarkTheme(),
-                    modifier = Modifier.fillMaxSize(),
-                )
-                ChangeFolderAction(
-                    modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
-                    onClick = { pickFolder()?.let(::open) },
+    IArtDevTheme(darkTheme = isSystemInDarkTheme()) {
+        Row(modifier = Modifier.fillMaxSize()) {
+            Sidebar(
+                selected = selectedScreen,
+                onSelect = { selectedScreen = it },
+                onRunSnapshot = { showRunner = true },
+                displayName = displayName,
+                onSignIn = { name ->
+                    Session.signIn(prefs, name)
+                    displayName = name
+                },
+                onSignOut = {
+                    Session.signOut(prefs)
+                    displayName = null
+                },
+            )
+            Column(modifier = Modifier.fillMaxSize().weight(1f)) {
+                Box(modifier = Modifier.fillMaxSize().weight(1f)) {
+                    when (selectedScreen) {
+                        Screen.Gallery -> GalleryContent(
+                            state = state,
+                            recent = recent,
+                            onOpenFolder = { pickFolder()?.let(::open) },
+                            onOpenRecent = ::open,
+                            onRemoveRecent = { path -> recent = RecentFolders.remove(prefs, path) },
+                            onRunSnapshot = { showRunner = true },
+                            onFolderDropped = ::open,
+                        )
+
+                        Screen.ToolPaths -> ToolPathsScreen(modifier = Modifier.fillMaxSize())
+                        Screen.Help -> HelpScreen(modifier = Modifier.fillMaxSize())
+                    }
+                }
+                syncError?.let { message ->
+                    BasicText(
+                        text = message,
+                        style = Studio.type.label.copy(color = SYNC_ERROR_COLOR),
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                    )
+                }
+                BottomBar(
+                    onChangeFolder = { pickFolder()?.let(::open) },
+                    onRunSnapshot = { showRunner = true },
+                    onSync = ::sync,
+                    syncEnabled = lastRunConfig != null,
+                    syncing = syncing,
                 )
             }
+        }
+    }
+
+    if (showRunner) {
+        SnapshotRunnerDialog(
+            onDismiss = { showRunner = false },
+            onSnapshotReady = { folder ->
+                showRunner = false
+                lastRunConfig = RunConfigStore.load(prefs)
+                open(folder)
+            },
+        )
+    }
+}
+
+@Composable
+private fun GalleryContent(
+    state: LoadState,
+    recent: List<RecentFolder>,
+    onOpenFolder: () -> Unit,
+    onOpenRecent: (File) -> Unit,
+    onRemoveRecent: (String) -> Unit,
+    onRunSnapshot: () -> Unit,
+    onFolderDropped: (File) -> Unit,
+) {
+    when (state) {
+        is LoadState.Loaded ->
+            ArtboardApp(
+                registry = state.registry,
+                title = state.manifest.title,
+                initialDarkTheme = isSystemInDarkTheme(),
+                modifier = Modifier.fillMaxSize(),
+            )
 
         is LoadState.Loading ->
             Onboarding(
                 isLoading = true,
-                loadingLabel = "Loading ${current.folder.name}…",
+                loadingLabel = "Loading ${state.folder.name}…",
                 errorMessage = null,
                 recent = recent,
-                onOpenFolder = { pickFolder()?.let(::open) },
-                onOpenRecent = ::open,
-                onRemoveRecent = { path -> recent = RecentFolders.remove(prefs, path) },
-                onRunSnapshot = { showRunner = true },
-                onFolderDropped = ::open,
+                onOpenFolder = onOpenFolder,
+                onOpenRecent = onOpenRecent,
+                onRemoveRecent = onRemoveRecent,
+                onRunSnapshot = onRunSnapshot,
+                onFolderDropped = onFolderDropped,
             )
 
         is LoadState.Failed ->
             Onboarding(
                 isLoading = false,
                 loadingLabel = "",
-                errorMessage = current.reason,
+                errorMessage = state.reason,
                 recent = recent,
-                onOpenFolder = { pickFolder()?.let(::open) },
-                onOpenRecent = ::open,
-                onRemoveRecent = { path -> recent = RecentFolders.remove(prefs, path) },
-                onRunSnapshot = { showRunner = true },
-                onFolderDropped = ::open,
+                onOpenFolder = onOpenFolder,
+                onOpenRecent = onOpenRecent,
+                onRemoveRecent = onRemoveRecent,
+                onRunSnapshot = onRunSnapshot,
+                onFolderDropped = onFolderDropped,
             )
 
         LoadState.Empty ->
@@ -176,22 +293,12 @@ private fun IArtDevApp(initialFolder: String? = null) {
                 loadingLabel = "",
                 errorMessage = null,
                 recent = recent,
-                onOpenFolder = { pickFolder()?.let(::open) },
-                onOpenRecent = ::open,
-                onRemoveRecent = { path -> recent = RecentFolders.remove(prefs, path) },
-                onRunSnapshot = { showRunner = true },
-                onFolderDropped = ::open,
+                onOpenFolder = onOpenFolder,
+                onOpenRecent = onOpenRecent,
+                onRemoveRecent = onRemoveRecent,
+                onRunSnapshot = onRunSnapshot,
+                onFolderDropped = onFolderDropped,
             )
-    }
-
-    if (showRunner) {
-        SnapshotRunnerDialog(
-            onDismiss = { showRunner = false },
-            onSnapshotReady = { folder ->
-                showRunner = false
-                open(folder)
-            },
-        )
     }
 }
 
@@ -225,31 +332,5 @@ private fun pickFolder(): File? {
         chooser.selectedFile
     } else {
         null
-    }
-}
-
-/**
- * Overlaid on top of [ArtboardApp], so it needs its own [StudioTheme] scope —
- * it is a sibling of the board's chrome, not a descendant of it. Deliberately keeps
- * Artboard's cobalt palette (not iArtDev's amber) since it's board-adjacent chrome.
- */
-@Composable
-private fun ChangeFolderAction(modifier: Modifier = Modifier, onClick: () -> Unit) {
-    StudioTheme(darkTheme = isSystemInDarkTheme()) {
-        val colors = LocalStudioColors.current
-        val interaction = remember { MutableInteractionSource() }
-        val hovered by interaction.collectIsHoveredAsState()
-        Box(
-            modifier = modifier
-                .clip(RoundedCornerShape(8.dp))
-                .background(colors.surfaceRaised.copy(alpha = if (hovered) 1f else 0.85f))
-                .border(1.dp, colors.line, RoundedCornerShape(8.dp))
-                .hoverable(interaction)
-                .pointerHoverIcon(PointerIcon.Hand)
-                .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-        ) {
-            BasicText(text = "Open different folder…", style = Studio.type.label.copy(color = colors.ink))
-        }
     }
 }
