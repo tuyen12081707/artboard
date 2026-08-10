@@ -8,7 +8,7 @@ plugins {
 
 group = "dev.iartdev"
 // jpackage requires a leading version component >= 1 for macOS/Windows installers.
-version = "1.2.0"
+version = "1.3.0"
 
 /**
  * iArtDev — standalone desktop viewer for Artboard-exported galleries

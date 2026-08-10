@@ -53,6 +53,7 @@ fun ToolPathsScreen(modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .fillMaxSize()
+            .background(colors.canvas)
             .padding(28.dp),
     ) {
         BasicText(text = "Tool Paths", style = Studio.type.zoneHeader.copy(color = colors.ink))

@@ -1,5 +1,6 @@
 package iartdev
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,6 +39,7 @@ import iartdev.snapshot.SnapshotManifest
 import iartdev.snapshot.SnapshotTile
 import iartdev.snapshot.SnapshotWatcher
 import iartdev.snapshot.parseSnapshotManifest
+import iartdev.theme.IArtDev
 import iartdev.theme.IArtDevTheme
 import iartdev.ui.BottomBar
 import iartdev.ui.HelpScreen
@@ -180,7 +182,8 @@ private fun IArtDevApp(initialFolder: String? = null) {
     }
 
     IArtDevTheme(darkTheme = isSystemInDarkTheme()) {
-        Row(modifier = Modifier.fillMaxSize()) {
+        val colors = IArtDev.colors
+        Row(modifier = Modifier.fillMaxSize().background(colors.canvas)) {
             Sidebar(
                 selected = selectedScreen,
                 onSelect = { selectedScreen = it },
