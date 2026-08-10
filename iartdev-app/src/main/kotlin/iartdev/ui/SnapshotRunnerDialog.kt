@@ -41,6 +41,7 @@ import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.unit.dp
 import artboard.host.Studio
+import iartdev.gradlerunner.AiFixHelper
 import iartdev.gradlerunner.ArtboardModuleCandidate
 import iartdev.gradlerunner.GradleProjectScanner
 import iartdev.gradlerunner.GradleSnapshotProcess
@@ -108,6 +109,29 @@ fun SnapshotRunnerDialog(
         val process = remember { GradleSnapshotProcess() }
         val keepAwake = remember { KeepAwake() }
         DisposableEffect(Unit) { onDispose { keepAwake.stop() } }
+        var lastAttemptedRoot by remember { mutableStateOf<File?>(null) }
+        val installedAiClis = remember { AiFixHelper.AUTOMATABLE_CLIS.filter(AiFixHelper::isInstalled) }
+        val aiOutput = remember { mutableStateListOf<String>() }
+        var aiRunning by remember { mutableStateOf(false) }
+
+        fun runAiDiagnosis(binary: String) {
+            val root = lastAttemptedRoot ?: return
+            aiOutput.clear()
+            aiRunning = true
+            val prompt = AiFixHelper.diagnosticPrompt(root, gradlePath, logLines.joinToString("\n"))
+            scope.launch {
+                AiFixHelper.runDiagnosis(binary, root, prompt).collect { event ->
+                    when (event) {
+                        is RunEvent.Line -> aiOutput.add(event.text)
+                        is RunEvent.Finished -> aiRunning = false
+                        is RunEvent.Failed -> {
+                            aiRunning = false
+                            aiOutput.add("Could not run $binary: ${event.error.message}")
+                        }
+                    }
+                }
+            }
+        }
 
         fun appendLog(line: String) {
             logLines.add(line)
@@ -133,6 +157,7 @@ fun SnapshotRunnerDialog(
 
         fun runSnapshot(root: File, wrapper: File) {
             logLines.clear()
+            lastAttemptedRoot = root
             val startedAt = System.currentTimeMillis()
             phase = RunnerPhase.Running(startedAt)
             // Android snapshot mode's Robolectric render can run for minutes — keep the
@@ -335,6 +360,36 @@ fun SnapshotRunnerDialog(
                                     Toolkit.getDefaultToolkit().systemClipboard
                                         .setContents(StringSelection(logLines.joinToString("\n")), null)
                                 }
+                                DialogTextAction(label = "Copy Diagnostic Prompt") {
+                                    val root = lastAttemptedRoot
+                                    if (root != null) {
+                                        val prompt = AiFixHelper.diagnosticPrompt(root, gradlePath, logLines.joinToString("\n"))
+                                        Toolkit.getDefaultToolkit().systemClipboard
+                                            .setContents(StringSelection(prompt), null)
+                                    }
+                                }
+                            }
+                        }
+                        if (installedAiClis.isNotEmpty()) {
+                            Spacer(Modifier.height(14.dp))
+                            BasicText(text = "STUCK? ASK AN AI CLI", style = Studio.type.badge.copy(color = colors.inkFaint))
+                            Spacer(Modifier.height(6.dp))
+                            BasicText(
+                                text = "Runs the already-authenticated CLI you have installed, read-only — it " +
+                                    "explains a fix, it doesn't edit anything.",
+                                style = Studio.type.label.copy(color = colors.inkFaint),
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                installedAiClis.forEach { binary ->
+                                    DialogButton(label = if (aiRunning) "Asking $binary…" else "Diagnose with $binary") {
+                                        if (!aiRunning) runAiDiagnosis(binary)
+                                    }
+                                }
+                            }
+                            if (aiOutput.isNotEmpty()) {
+                                Spacer(Modifier.height(8.dp))
+                                LogPanel(lines = aiOutput, colors = colors)
                             }
                         }
                     }

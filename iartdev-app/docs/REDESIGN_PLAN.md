@@ -161,6 +161,34 @@ a **Help / Shortcuts** panel (what each screen does, keyboard shortcuts)
 and an **About** panel (version, links to this doc, links to the Artboard
 README). Anything larger should be a separate, explicitly-scoped request.
 
+### D7 — "Log into Claude/Codex/Antigravity" is CLI diagnosis, not credential storage
+Follow-up clarification narrowed D4: the ask is "sign into these AI agents,
+then have the agent configure the Artboard module / fix errors it hits."
+Read literally that's iArtDev owning an OAuth/credential flow for three
+third-party CLIs — a security-sensitive shape I won't invent from an
+assumption, especially for "Antigravity," which isn't identifiable as a
+specific tool/binary from the request alone.
+
+What shipped instead, in `AiFixHelper`: the user already authenticates
+these CLIs themselves, however each one normally wants it (`claude login`,
+`codex login`, etc., run once in their own terminal, outside iArtDev).
+When a snapshot run fails, iArtDev detects which of `claude`/`codex` are on
+`PATH` and offers a **"Diagnose with `<tool>`"** button that shells out to
+that already-authenticated binary — same trust boundary
+`GradleSnapshotProcess` already uses for the project's own `./gradlew`,
+nothing iArtDev stores or manages. The prompt explicitly asks the CLI to
+*explain* a fix, not apply one — autonomously letting a subprocess edit a
+real project's files from a GUI button, with permission flags this codebase
+can't verify are safe by default, is a materially riskier feature than
+"explain what's wrong," and out of scope here. A **"Copy Diagnostic
+Prompt"** action covers Antigravity or anything else not on the detected
+list — paste it into whichever tool, manually.
+
+Command syntax (`<binary> -p <prompt>`) is confirmed for Claude Code's
+non-interactive mode; best-effort for other CLIs. If a tool's flags differ,
+the process just exits with a visible error in the log, not a silent wrong
+action.
+
 ## 7. Milestones
 
 - [ ] M1 — This plan file (done once this commit lands)

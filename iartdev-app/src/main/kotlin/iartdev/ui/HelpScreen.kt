@@ -1,5 +1,6 @@
 package iartdev.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -55,6 +56,7 @@ fun HelpScreen(modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
             .fillMaxSize()
+            .background(colors.canvas)
             .verticalScroll(rememberScrollState())
             .padding(28.dp),
     ) {
