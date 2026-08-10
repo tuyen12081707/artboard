@@ -44,12 +44,16 @@ import artboard.host.Studio
 import iartdev.gradlerunner.ArtboardModuleCandidate
 import iartdev.gradlerunner.GradleProjectScanner
 import iartdev.gradlerunner.GradleSnapshotProcess
+import iartdev.gradlerunner.KeepAwake
 import iartdev.gradlerunner.PluginInstallResult
 import iartdev.gradlerunner.RunEvent
 import iartdev.gradlerunner.appliesArtboardPlugin
 import iartdev.gradlerunner.artboardPluginLine
 import iartdev.gradlerunner.installArtboardPlugin
 import iartdev.gradlerunner.settingsLooksPluginReady
+import iartdev.prefs.RunConfig
+import iartdev.prefs.RunConfigStore
+import iartdev.prefs.iartdevPrefs
 import iartdev.theme.IArtDev
 import iartdev.theme.IArtDevColors
 import iartdev.theme.IArtDevTheme
@@ -102,6 +106,8 @@ fun SnapshotRunnerDialog(
         val logLines = remember { mutableStateListOf<String>() }
         var elapsedSeconds by remember { mutableIntStateOf(0) }
         val process = remember { GradleSnapshotProcess() }
+        val keepAwake = remember { KeepAwake() }
+        DisposableEffect(Unit) { onDispose { keepAwake.stop() } }
 
         fun appendLog(line: String) {
             logLines.add(line)
@@ -129,15 +135,21 @@ fun SnapshotRunnerDialog(
             logLines.clear()
             val startedAt = System.currentTimeMillis()
             phase = RunnerPhase.Running(startedAt)
+            // Android snapshot mode's Robolectric render can run for minutes — keep the
+            // machine awake for the duration so a closed lid / screen timeout doesn't
+            // stall it. Stopped in every terminal branch below.
+            keepAwake.start()
             scope.launch {
                 process.run(root, wrapper, gradlePath).collect { event ->
                     when (event) {
                         is RunEvent.Line -> appendLog(event.text)
                         is RunEvent.Finished -> {
+                            keepAwake.stop()
                             if (event.exitCode == 0) {
                                 val manifest = GradleSnapshotProcess.manifestFile(root, gradlePath)
                                 if (manifest.isFile) {
                                     phase = RunnerPhase.Succeeded
+                                    RunConfigStore.save(iartdevPrefs(), RunConfig(root.absolutePath, gradlePath))
                                     onSnapshotReady(manifest.parentFile)
                                 } else {
                                     phase = RunnerPhase.Failed(
@@ -149,7 +161,10 @@ fun SnapshotRunnerDialog(
                                 phase = RunnerPhase.Failed("Gradle exited with code ${event.exitCode} — see log below.")
                             }
                         }
-                        is RunEvent.Failed -> phase = RunnerPhase.Failed(event.error.message ?: "Could not start Gradle.")
+                        is RunEvent.Failed -> {
+                            keepAwake.stop()
+                            phase = RunnerPhase.Failed(event.error.message ?: "Could not start Gradle.")
+                        }
                     }
                 }
             }
@@ -194,7 +209,9 @@ fun SnapshotRunnerDialog(
                 when (val current = phase) {
                     RunnerPhase.PickProject -> {
                         BasicText(
-                            text = "Point iArtDev at the root of a Gradle project that applies the Artboard plugin.",
+                            text = "Choose the project's ROOT folder — the one that directly contains gradlew " +
+                                "(and settings.gradle.kts). Not a module subfolder like app/ or feature/ui/ — " +
+                                "picking one of those fails with \"No gradlew found\".",
                             style = Studio.type.body.copy(color = colors.inkSoft),
                         )
                         Spacer(Modifier.height(14.dp))
@@ -215,7 +232,7 @@ fun SnapshotRunnerDialog(
                             Spacer(Modifier.height(10.dp))
                         } else if (current.candidates.isEmpty()) {
                             BasicText(
-                                text = "No module here already has Artboard applied — enter the Gradle path of " +
+                                text = "No module here already has Artboard applied — type the Gradle path of " +
                                     "your Compose UI module below and iArtDev will offer to set it up.",
                                 style = Studio.type.body.copy(color = colors.inkSoft),
                             )
@@ -223,27 +240,45 @@ fun SnapshotRunnerDialog(
                         }
                         BasicText(text = "GRADLE PATH", style = Studio.type.badge.copy(color = colors.inkFaint))
                         Spacer(Modifier.height(4.dp))
-                        GradlePathField(value = gradlePath, onValueChange = { gradlePath = it }, colors = colors)
+                        BasicText(
+                            text = "Type the module's Gradle path (not a folder to browse to) — same as you'd " +
+                                "pass to ./gradlew, e.g. :feature:my-module or :app. Leave empty for the root project.",
+                            style = Studio.type.label.copy(color = colors.inkFaint),
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        GradlePathField(
+                            value = gradlePath,
+                            onValueChange = { gradlePath = it },
+                            placeholder = ":feature:my-module",
+                            colors = colors,
+                        )
                         Spacer(Modifier.height(14.dp))
-                        DialogButton(label = "Run artboardSnapshot") {
-                            val buildFile = GradleProjectScanner.moduleBuildFile(current.projectRoot, gradlePath)
-                            if (buildFile.isFile && buildFile.appliesArtboardPlugin()) {
-                                runSnapshot(current.projectRoot, current.wrapper)
-                            } else {
-                                val settingsFile = GradleProjectScanner.findSettingsFile(current.projectRoot)
-                                val settingsWarning = if (settingsFile == null || !settingsLooksPluginReady(settingsFile)) {
-                                    "Heads up: ${settingsFile?.name ?: "settings.gradle.kts"} doesn't obviously list " +
-                                        "mavenCentral() for plugin resolution — if the run below fails to resolve " +
-                                        "the plugin, add it there."
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            DialogButton(label = "Run artboardSnapshot") {
+                                val buildFile = GradleProjectScanner.moduleBuildFile(current.projectRoot, gradlePath)
+                                if (buildFile.isFile && buildFile.appliesArtboardPlugin()) {
+                                    runSnapshot(current.projectRoot, current.wrapper)
                                 } else {
-                                    null
+                                    val settingsFile = GradleProjectScanner.findSettingsFile(current.projectRoot)
+                                    val settingsWarning = if (settingsFile == null || !settingsLooksPluginReady(settingsFile)) {
+                                        "Heads up: ${settingsFile?.name ?: "settings.gradle.kts"} doesn't obviously list " +
+                                            "mavenCentral() for plugin resolution — if the run below fails to resolve " +
+                                            "the plugin, add it there."
+                                    } else {
+                                        null
+                                    }
+                                    phase = RunnerPhase.ConfirmInstall(
+                                        previous = current,
+                                        buildFile = buildFile,
+                                        previewLine = artboardPluginLine(),
+                                        settingsWarning = settingsWarning,
+                                    )
                                 }
-                                phase = RunnerPhase.ConfirmInstall(
-                                    previous = current,
-                                    buildFile = buildFile,
-                                    previewLine = artboardPluginLine(),
-                                    settingsWarning = settingsWarning,
-                                )
+                            }
+                            DialogTextAction(label = "Copy Command") {
+                                val task = if (gradlePath.isEmpty()) "artboardSnapshot" else "$gradlePath:artboardSnapshot"
+                                Toolkit.getDefaultToolkit().systemClipboard
+                                    .setContents(StringSelection("./gradlew $task"), null)
                             }
                         }
                     }
@@ -343,7 +378,12 @@ private fun ModuleRow(label: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun GradlePathField(value: String, onValueChange: (String) -> Unit, colors: IArtDevColors) {
+private fun GradlePathField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    colors: IArtDevColors,
+) {
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
@@ -356,6 +396,14 @@ private fun GradlePathField(value: String, onValueChange: (String) -> Unit, colo
             .clip(RoundedCornerShape(6.dp))
             .border(1.dp, colors.line, RoundedCornerShape(6.dp))
             .padding(horizontal = 10.dp, vertical = 8.dp),
+        decorationBox = { innerTextField ->
+            Box(contentAlignment = Alignment.CenterStart) {
+                if (value.isEmpty()) {
+                    BasicText(text = placeholder, style = Studio.type.mono.copy(color = colors.inkFaint))
+                }
+                innerTextField()
+            }
+        },
     )
 }
 

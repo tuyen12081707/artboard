@@ -144,7 +144,7 @@ fun Onboarding(
                 }
 
                 Spacer(Modifier.height(28.dp))
-                OnboardingStep(1, "Point iArtDev at your project", "It finds your Compose module and offers to apply the Artboard plugin for you — no manual editing.")
+                OnboardingStep(1, "Point iArtDev at your project", "Pick the project's root folder — the one containing gradlew — not a specific module's subfolder. iArtDev finds your Compose module and offers to apply the Artboard plugin for you.")
                 OnboardingStep(2, "Run a snapshot", "iArtDev runs it for you — or use a terminal: ./gradlew :module:artboardSnapshot")
                 OnboardingStep(3, "Browse the result", "Opens automatically, and auto-refreshes whenever you re-run a snapshot.")
 
